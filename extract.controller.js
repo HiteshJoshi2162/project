@@ -1,4 +1,4 @@
-const extractService = require('../services/extract.service');
+const extractService = require('./extract.service');
 const { validateUrl } = require('../utils/validator');
 
 /**
