@@ -1,15 +1,10 @@
-const extractService = require('./extract.service');
-const { validateUrl } = require('./validator');
+const extractService = require('../services/extract.service');
+const { validateUrl } = require('../utils/validator');
 
 /**
- * Controller for media extraction
- * Returns standardized success or error responses
+ * Common logic for processing extraction requests
  */
-const extractMedia = async (req, res, next) => {
-    const { url } = req.body;
-
-    console.log(`[API] POST /extract - URL: ${url}`);
-
+const processExtraction = async (url, res) => {
     try {
         if (!url) {
             return res.status(400).json({
@@ -52,10 +47,10 @@ const extractMedia = async (req, res, next) => {
         console.error(`[API] Extraction Failed: ${error.message}`);
 
         // Handle specific error cases
-        if (error.message.includes('IG_BLOCKED') || error.message.includes('blocking')) {
+        if (error.message.includes('IG_BLOCKED') || error.message.includes('blocking') || error.message.includes('private')) {
             return res.status(403).json({
                 status: 'error',
-                message: 'Instagram is temporarily blocking our requests. Please try again in a few minutes.'
+                message: 'Private or restricted content. Cannot download without login.'
             });
         }
 
@@ -73,4 +68,22 @@ const extractMedia = async (req, res, next) => {
     }
 };
 
-module.exports = { extractMedia };
+/**
+ * Controller for POST /extract
+ */
+const extractMedia = async (req, res, next) => {
+    const { url } = req.body;
+    console.log(`[API] POST /extract - URL: ${url}`);
+    await processExtraction(url, res);
+};
+
+/**
+ * Controller for GET /download?url={url}
+ */
+const downloadMedia = async (req, res, next) => {
+    const { url } = req.query;
+    console.log(`[API] GET /download - URL: ${url}`);
+    await processExtraction(url, res);
+};
+
+module.exports = { extractMedia, downloadMedia };
