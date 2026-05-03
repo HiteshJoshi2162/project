@@ -1,5 +1,5 @@
-const extractService = require('./extract.service');
-const { validateUrl } = require('./validator');
+const extractService = require('../services/extract.service');
+const { validateUrl } = require('../utils/validator');
 
 // 🔥 URL CLEANER (IMPORTANT)
 const cleanUrl = (url) => {
@@ -17,6 +17,8 @@ const processExtraction = async (url, res) => {
 
         // ✅ Clean URL
         url = cleanUrl(url);
+
+console.log("📥 Incoming URL:", url);
 
         if (!validateUrl(url)) {
             return res.status(400).json({
