@@ -3,6 +3,5 @@ const router = express.Router();
 const extractController = require('./extract.controller');
 const rateLimiter = require('./rateLimiter');
 
-router.post('/extract', rateLimiter, extractController.handleExtraction);
-
+router.post('/extract', rateLimiter, extractController.extractMedia);
 module.exports = router;
