@@ -1,7 +1,7 @@
-const extractService = require('./extract.service');
-const { validateUrl } = require('./validator');
+const extractService = require('../services/extract.service');
+const { validateUrl } = require('../utils/validator');
 
-// 🔥 URL CLEANER (IMPORTANT)
+// 🔥 URL CLEANER
 const cleanUrl = (url) => {
     return url.split("?")[0];
 };
@@ -15,10 +15,9 @@ const processExtraction = async (url, res) => {
             });
         }
 
-        // ✅ Clean URL
         url = cleanUrl(url);
 
-console.log("📥 Incoming URL:", url);
+        console.log("📥 Incoming URL:", url);
 
         if (!validateUrl(url)) {
             return res.status(400).json({
@@ -27,18 +26,12 @@ console.log("📥 Incoming URL:", url);
             });
         }
 
-        console.log("📥 Processing URL:", url);
+        const media = await extractService.getMediaMetadata(url);
 
-        // 🔥 Timeout safety
-        const media = await Promise.race([
-            extractService.getMediaMetadata(url),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("TIMEOUT")), 20000)
-            )
-        ]);
+        console.log("✅ Media found:", media);
 
         if (!media || !media.downloadUrl) {
-            throw new Error("NO_MEDIA_FOUND");
+            throw new Error("NO_MEDIA");
         }
 
         return res.status(200).json({
@@ -54,19 +47,9 @@ console.log("📥 Incoming URL:", url);
     } catch (error) {
         console.error("❌ ERROR:", error.message);
 
-        let message = "Something went wrong";
-
-        if (error.message === "TIMEOUT") {
-            message = "Server timeout, try again";
-        } else if (error.message === "NO_MEDIA_FOUND") {
-            message = "Media not found";
-        } else if (error.message.includes("blocked")) {
-            message = "Instagram blocked request";
-        }
-
         return res.status(500).json({
             status: 'error',
-            message
+            message: error.message || "Something went wrong"
         });
     }
 };
