@@ -1,5 +1,5 @@
-const extractService = require('../services/extract.service');
-const { validateUrl } = require('../utils/validator');
+const extractService = require('./extract.service');
+const { validateUrl } = require('./validator');
 
 // 🔥 URL CLEANER (IMPORTANT)
 const cleanUrl = (url) => {
