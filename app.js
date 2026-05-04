@@ -16,7 +16,7 @@ let browser;
 // ---------------- INIT BROWSER ----------------
 async function initBrowser() {
   browser = await puppeteer.launch({
-    headless: false,
+    headless: true,
     executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     args: ["--no-sandbox", "--disable-setuid-sandbox"]
   });
