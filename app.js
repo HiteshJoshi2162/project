@@ -17,16 +17,27 @@ let browser;
 async function initBrowser() {
   browser = await puppeteer.launch({
     headless: false,
-    executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", // ✅ FIXED
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--single-process"
-    ]
+    executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
   });
 
-  console.log("🚀 Browser started");
+  const page = await browser.newPage();
+
+  // 🔥 FORCE OPEN INSTAGRAM
+  await page.goto("https://www.instagram.com/accounts/login/", {
+    waitUntil: "domcontentloaded"
+  });
+
+  console.log("🌐 Opened Instagram login");
+
+  // 🔥 WAIT FOR YOU TO LOGIN MANUALLY
+  await new Promise(resolve => setTimeout(resolve, 60000)); // 60 sec wait
+
+  // 🔥 SAVE COOKIES AFTER LOGIN
+  const cookies = await page.cookies();
+  await fs.writeFile("cookies.json", JSON.stringify(cookies, null, 2));
+
+  console.log("✅ Cookies saved");
 }
 
 // ---------------- LOGIN ----------------
