@@ -21,23 +21,7 @@ async function initBrowser() {
     args: ["--no-sandbox", "--disable-setuid-sandbox"]
   });
 
-  const page = await browser.newPage();
-
-  // 🔥 FORCE OPEN INSTAGRAM
-  await page.goto("https://www.instagram.com/accounts/login/", {
-    waitUntil: "domcontentloaded"
-  });
-
-  console.log("🌐 Opened Instagram login");
-
-  // 🔥 WAIT FOR YOU TO LOGIN MANUALLY
-  await new Promise(resolve => setTimeout(resolve, 60000)); // 60 sec wait
-
-  // 🔥 SAVE COOKIES AFTER LOGIN
-  const cookies = await page.cookies();
-  await fs.writeFile("cookies.json", JSON.stringify(cookies, null, 2));
-
-  console.log("✅ Cookies saved");
+  console.log("🚀 Browser started");
 }
 
 // ---------------- LOGIN ----------------
