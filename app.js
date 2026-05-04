@@ -15,14 +15,21 @@ let browser;
 
 // ---------------- INIT BROWSER ----------------
 async function initBrowser() {
+  const isRender = process.env.RENDER === "true";
+
   browser = await puppeteer.launch({
     headless: true,
-    executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    executablePath: isRender
+      ? undefined // Render pe auto chromium use karega
+      : "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
-      "--disable-gpu"
+      "--disable-gpu",
+      "--single-process",
+      "--no-zygote"
     ]
   });
 
