@@ -4,7 +4,7 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "postinstall": "PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer npx puppeteer browsers install chrome"
+    "build": "npx puppeteer browsers install chrome"
   },
   "dependencies": {
     "dotenv": "^16.0.0",
