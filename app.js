@@ -19,8 +19,9 @@ async function initBrowser() {
 
   browser = await puppeteer.launch({
     headless: true,
+
     executablePath: isRender
-      ? undefined // Render pe auto chromium use karega
+      ? "/usr/bin/google-chrome"   // 🔥 Render compatible path
       : "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
 
     args: [
@@ -35,7 +36,6 @@ async function initBrowser() {
 
   console.log("🚀 Browser started");
 }
-
 // ---------------- LOGIN ----------------
 async function login(page) {
   console.log("🔐 Logging in...");
