@@ -3,6 +3,7 @@ const express = require("express");
 const fs = require("fs-extra");
 const puppeteer = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+const chromium = require("@sparticuz/chromium"); // 🔥 IMPORTANT
 
 puppeteer.use(StealthPlugin());
 
@@ -19,18 +20,21 @@ async function initBrowser() {
 
   browser = await puppeteer.launch({
     headless: true,
+
     executablePath: isRender
-      ? undefined // ✅ Render → auto chromium
+      ? await chromium.executablePath() // ✅ Render FIX
       : "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
 
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--single-process",
-      "--no-zygote"
-    ]
+    args: isRender
+      ? chromium.args
+      : [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--single-process",
+          "--no-zygote"
+        ]
   });
 
   console.log("🚀 Browser started");
@@ -86,7 +90,6 @@ async function extractMedia(url) {
 
     await loadCookies(page);
 
-    // Network listener
     const client = await page.target().createCDPSession();
     await client.send("Network.enable");
 
@@ -102,10 +105,8 @@ async function extractMedia(url) {
       timeout: 30000
     });
 
-    // scroll
     await page.evaluate(() => window.scrollBy(0, 800));
 
-    // fallback: video tag
     try {
       await page.waitForSelector("video", { timeout: 8000 });
 
@@ -130,7 +131,7 @@ async function extractMedia(url) {
     console.error("❌ Extraction error:", err.message);
     throw err;
   } finally {
-    await page.close(); // ✅ important
+    await page.close();
   }
 }
 
