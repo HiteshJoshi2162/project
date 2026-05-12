@@ -46,7 +46,8 @@ console.log("📥 Incoming URL:", url);
             media: [
                 {
                     type: media.isVideo ? "video" : "image",
-                    url: media.downloadUrl
+                    url: media.downloadUrl,
+                    thumbnail: media.thumbnailUrl // Add thumbnail here
                 }
             ]
         };
