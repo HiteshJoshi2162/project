@@ -1,7 +1,7 @@
 const extractService = require('./extract.service');
 const { validateUrl } = require('./validator');
 
-// 🔥 URL CLEANER
+// 🔥 URL CLEANER (IMPORTANT)
 const cleanUrl = (url) => {
     return url.split("?")[0];
 };
@@ -15,9 +15,10 @@ const processExtraction = async (url, res) => {
             });
         }
 
+        // ✅ Clean URL
         url = cleanUrl(url);
 
-        console.log("📥 Incoming URL:", url);
+console.log("📥 Incoming URL:", url);
 
         if (!validateUrl(url)) {
             return res.status(400).json({
@@ -26,30 +27,49 @@ const processExtraction = async (url, res) => {
             });
         }
 
-        const media = await extractService.getMediaMetadata(url);
+        console.log("📥 Processing URL:", url);
 
-        console.log("✅ Media found:", media);
+        // 🔥 Timeout safety
+        const media = await Promise.race([
+            extractService.getMediaMetadata(url),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("TIMEOUT")), 45000)
+            )
+        ]);
 
         if (!media || !media.downloadUrl) {
-            throw new Error("NO_MEDIA");
+            throw new Error("NO_MEDIA_FOUND");
         }
 
-        return res.status(200).json({
+        const result = {
             status: 'success',
-            media: {
-                downloadUrl: media.downloadUrl,
-                thumbnailUrl: media.thumbnailUrl,
-                isVideo: media.isVideo,
-                title: media.caption || "Instagram Media"
-            }
-        });
+            media: [
+                {
+                    type: media.isVideo ? "video" : "image",
+                    url: media.downloadUrl
+                }
+            ]
+        };
+
+        console.log("✅ Sending Success Response:", JSON.stringify(result));
+        return res.status(200).json(result);
 
     } catch (error) {
-        console.error("❌ ERROR:", error.message);
+        console.error("❌ ERROR DETAILS:", error);
+
+        let message = error.message || "Something went wrong";
+
+        if (error.message === "TIMEOUT") {
+            message = "Server timeout, Instagram is taking too long to respond";
+        } else if (error.message === "MEDIA_NOT_FOUND") {
+            message = "Could not find any video or image in this link. Make sure the account is public.";
+        } else if (error.message === "INVALID_URL") {
+            message = "Please provide a valid Instagram link";
+        }
 
         return res.status(500).json({
             status: 'error',
-            message: error.message || "Something went wrong"
+            message
         });
     }
 };
