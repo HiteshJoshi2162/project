@@ -3,9 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const extractRoutes = require('/extract.routes');
-const { errorHandler } = require('/error.middleware');
-const { initBrowser } = require('/extract.service');
+const extractRoutes = require('./extract.routes');
+const { errorHandler } = require('./error.middleware');
+const { initBrowser } = require('./extract.service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
