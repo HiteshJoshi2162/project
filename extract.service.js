@@ -9,12 +9,7 @@ let browser;
 
 async function initBrowser() {
     if (browser) return browser;
-
     console.log("🚀 Initializing Browser...");
-
-    // We will try to launch without specifying path first (works locally with 'puppeteer' full)
-    // If that fails, we will try to find common paths.
-
     const launchArgs = [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -24,65 +19,41 @@ async function initBrowser() {
         "--no-zygote",
         "--single-process"
     ];
-
     try {
-        console.log("尝试 1: Standard launch...");
         browser = await puppeteer.launch({
             headless: "new",
             args: launchArgs
         });
-        console.log("✅ Browser started with standard launch");
+        console.log("✅ Browser started");
         return browser;
     } catch (err) {
-        console.log("⚠️ Standard launch failed, trying Render-specific setup...");
-
         try {
-            // Try to find chromium if it's on Render
             const chromium = require("@sparticuz/chromium");
             browser = await puppeteer.launch({
                 executablePath: await chromium.executablePath(),
                 args: [...chromium.args, ...launchArgs],
                 headless: chromium.headless,
             });
-            console.log("✅ Browser started with @sparticuz/chromium");
             return browser;
         } catch (err2) {
-            console.log("⚠️ @sparticuz/chromium failed or not found.");
-
-            // Last resort: Try common Windows paths if local
-            const commonPaths = [
-                "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-                "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-                "/usr/bin/google-chrome",
-                "/usr/bin/chromium-browser"
-            ];
-
+            const commonPaths = ["C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", "/usr/bin/google-chrome"];
             for (const path of commonPaths) {
                 if (fs.existsSync(path)) {
-                    try {
-                        console.log(`尝试 path: ${path}`);
-                        browser = await puppeteer.launch({
-                            executablePath: path,
-                            headless: "new",
-                            args: launchArgs
-                        });
-                        console.log(`✅ Browser started with path: ${path}`);
-                        return browser;
-                    } catch (e) {}
+                    browser = await puppeteer.launch({ executablePath: path, headless: "new", args: launchArgs });
+                    return browser;
                 }
             }
         }
     }
-
-    throw new Error("Could not start browser. Please ensure Chrome is installed.");
+    throw new Error("Could not start browser.");
 }
 
-// ... rest of the file (login, loadCookies, getMediaMetadata)
 async function login(page) {
     const user = process.env.IG_USERNAME;
     const pass = process.env.IG_PASSWORD;
     if (!user || user === "your_username") return;
     try {
+        console.log("🔐 Logging in...");
         await page.goto("https://www.instagram.com/accounts/login/", { waitUntil: "networkidle2", timeout: 60000 });
         await page.waitForSelector("input[name=username]", { timeout: 10000 });
         await page.type("input[name=username]", user, { delay: 100 });
@@ -113,20 +84,38 @@ async function getMediaMetadata(url) {
     try {
         await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36");
         await loadCookies(page);
+
         const client = await page.target().createCDPSession();
         await client.send("Network.enable");
         client.on("Network.responseReceived", (response) => {
             const resUrl = response.response.url;
-            if (resUrl.includes(".mp4") && !resUrl.includes("blob:")) mediaUrls.push(resUrl);
+            if ((resUrl.includes(".mp4") || resUrl.includes("video_dashinit")) && !resUrl.includes("blob:")) {
+                console.log("🎯 Found video URL:", resUrl);
+                mediaUrls.push(resUrl);
+            }
         });
-        await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
-        await page.evaluate(() => window.scrollBy(0, 800));
-        await new Promise(r => setTimeout(r, 3000));
+
+        console.log("📡 Navigating to:", url);
+        await page.goto(url, { waitUntil: "networkidle0", timeout: 60000 });
+
+        // Better scrolling
+        await page.evaluate(async () => {
+            for(let i=0; i<3; i++) {
+                window.scrollBy(0, 400);
+                await new Promise(r => setTimeout(r, 800));
+            }
+        });
+
         const videoSrc = await page.evaluate(() => {
             const video = document.querySelector("video");
-            return video ? video.src : null;
+            return (video && video.src && !video.src.includes("blob:")) ? video.src : null;
         });
-        if (videoSrc && !videoSrc.includes("blob:")) mediaUrls.push(videoSrc);
+        if (videoSrc) mediaUrls.push(videoSrc);
+
+        if (mediaUrls.length === 0) {
+            console.log("⌛ Waiting for dynamic load...");
+            await new Promise(r => setTimeout(r, 5000));
+        }
     } catch (err) {
         console.error("❌ Extraction error:", err.message);
     } finally {
