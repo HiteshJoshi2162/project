@@ -97,6 +97,7 @@ async function getMediaMetadata(url) {
 
     const page = await browser.newPage();
     let mediaUrls = [];
+    let thumbnailUrl = null;
 
     try {
         await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36");
@@ -108,7 +109,6 @@ async function getMediaMetadata(url) {
         client.on("Network.responseReceived", (response) => {
             const resUrl = response.response.url;
             if ((resUrl.includes(".mp4") || resUrl.includes("video_dashinit")) && !resUrl.includes("blob:")) {
-                console.log("📹 Found video via network:", resUrl);
                 mediaUrls.push(resUrl);
             }
         });
@@ -116,29 +116,44 @@ async function getMediaMetadata(url) {
         console.log("📡 Navigating...");
         await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-        // Better scrolling logic
+        // Scroll a bit
         await page.evaluate(async () => {
-            for(let i=0; i<4; i++) {
-                window.scrollBy(0, 500);
-                await new Promise(r => setTimeout(r, 1000));
-            }
+            window.scrollBy(0, 500);
+            await new Promise(r => setTimeout(r, 1000));
         });
 
-        const videoSrc = await page.evaluate(() => {
+        // Extract video and poster
+        const metadata = await page.evaluate(() => {
             const video = document.querySelector("video");
-            if (video && video.src && !video.src.includes("blob:")) return video.src;
-            const sources = Array.from(document.querySelectorAll("video source"));
-            return sources.length > 0 ? sources[0].src : null;
+            let vSrc = null;
+            let pSrc = null;
+
+            if (video) {
+                vSrc = (video.src && !video.src.includes("blob:")) ? video.src : null;
+                pSrc = video.poster || null;
+
+                // If src is still null, check children
+                if (!vSrc) {
+                    const sources = Array.from(document.querySelectorAll("video source"));
+                    if (sources.length > 0) vSrc = sources[0].src;
+                }
+            }
+
+            // If no poster found, try to find the main image
+            if (!pSrc) {
+                const images = Array.from(document.querySelectorAll("img"));
+                const mainImg = images.find(img => img.width > 200 && img.height > 200);
+                if (mainImg) pSrc = mainImg.src;
+            }
+
+            return { vSrc, pSrc };
         });
 
-        if (videoSrc) {
-            console.log("📹 Found video via DOM:", videoSrc);
-            mediaUrls.push(videoSrc);
-        }
+        if (metadata.vSrc) mediaUrls.push(metadata.vSrc);
+        thumbnailUrl = metadata.pSrc;
 
         if (mediaUrls.length === 0) {
-            console.log("⌛ Still looking, waiting 5s...");
-            await new Promise(r => setTimeout(r, 5000));
+            await new Promise(r => setTimeout(r, 4000));
         }
     } catch (err) {
         console.error("❌ Page Error:", err.message);
@@ -149,12 +164,14 @@ async function getMediaMetadata(url) {
     const uniqueUrls = [...new Set(mediaUrls)].filter(u => u.startsWith('http'));
 
     if (uniqueUrls.length === 0) {
-        console.error("❌ No media found for this URL");
         throw new Error("MEDIA_NOT_FOUND");
     }
 
-    console.log("✅ Extraction successful, returning link");
-    return { downloadUrl: uniqueUrls[0], isVideo: true };
+    return {
+        downloadUrl: uniqueUrls[0],
+        thumbnailUrl: thumbnailUrl,
+        isVideo: true
+    };
 }
 
 module.exports = { getMediaMetadata, initBrowser };
