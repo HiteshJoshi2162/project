@@ -3,7 +3,12 @@ const { validateUrl } = require('./validator');
 
 // 🔥 URL CLEANER (IMPORTANT)
 const cleanUrl = (url) => {
-    return url.split("?")[0];
+    if (!url) return "";
+    let cleaned = url.trim();
+    if (!cleaned.startsWith("http")) {
+        cleaned = "https://" + cleaned;
+    }
+    return cleaned.split("?")[0];
 };
 
 const processExtraction = async (url, res) => {
