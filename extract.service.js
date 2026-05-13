@@ -7,17 +7,17 @@ const initBrowser = async () => {
     if (browser) return browser;
 
     browser = await puppeteer.launch({
-        headless: "new",
+        headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
-            '--disable-features=site-per-process'
+            '--window-size=1920,1080'
         ]
     });
 
-    console.log("✅ Puppeteer Browser Started");
+    console.log('✅ Puppeteer Started');
 
     return browser;
 };
@@ -41,57 +41,106 @@ const getMediaMetadata = async (url) => {
         });
 
         await page.goto(url, {
-            waitUntil: 'networkidle2',
+            waitUntil: 'domcontentloaded',
             timeout: 60000
         });
 
-        // Wait little for Instagram
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Wait for scripts
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
+        // Extract Media
         const media = await page.evaluate(() => {
 
-            const video =
+            // VIDEO
+            const videoMeta =
                 document.querySelector('meta[property="og:video"]')?.content ||
                 document.querySelector('meta[property="og:video:url"]')?.content;
 
-            const image =
+            // IMAGE
+            const imageMeta =
                 document.querySelector('meta[property="og:image"]')?.content;
 
-            return {
-                video,
-                image
-            };
+            if (videoMeta) {
+                return {
+                    isVideo: true,
+                    downloadUrl: videoMeta,
+                    thumbnailUrl: imageMeta || videoMeta
+                };
+            }
+
+            if (imageMeta) {
+                return {
+                    isVideo: false,
+                    downloadUrl: imageMeta,
+                    thumbnailUrl: imageMeta
+                };
+            }
+
+            // NEW INSTAGRAM JSON METHOD
+            const scripts = Array.from(document.querySelectorAll('script'));
+
+            for (const script of scripts) {
+
+                const text = script.innerHTML;
+
+                // Find video URL
+                const videoMatch = text.match(
+                    /"video_url":"([^"]+)"/
+                );
+
+                // Find image URL
+                const imageMatch = text.match(
+                    /"display_url":"([^"]+)"/
+                );
+
+                if (videoMatch) {
+
+                    return {
+                        isVideo: true,
+                        downloadUrl: videoMatch[1]
+                            .replace(/\\u0026/g, '&')
+                            .replace(/\\/g, ''),
+                        thumbnailUrl: imageMatch
+                            ? imageMatch[1]
+                                .replace(/\\u0026/g, '&')
+                                .replace(/\\/g, '')
+                            : null
+                    };
+                }
+
+                if (imageMatch) {
+
+                    return {
+                        isVideo: false,
+                        downloadUrl: imageMatch[1]
+                            .replace(/\\u0026/g, '&')
+                            .replace(/\\/g, ''),
+                        thumbnailUrl: imageMatch[1]
+                            .replace(/\\u0026/g, '&')
+                            .replace(/\\/g, '')
+                    };
+                }
+            }
+
+            return null;
         });
 
-        if (media.video) {
-
-            return {
-                isVideo: true,
-                downloadUrl: media.video,
-                thumbnailUrl: media.image || media.video
-            };
+        if (!media) {
+            throw new Error('NO_MEDIA_FOUND');
         }
 
-        if (media.image) {
-
-            return {
-                isVideo: false,
-                downloadUrl: media.image,
-                thumbnailUrl: media.image
-            };
-        }
-
-        throw new Error('NO_MEDIA_FOUND');
+        return media;
 
     } catch (err) {
 
-        console.error("❌ SERVICE ERROR:", err.message);
+        console.error('❌ SERVICE ERROR:', err.message);
 
         throw new Error('MEDIA_NOT_FOUND');
 
     } finally {
 
         if (page) {
+
             try {
                 await page.close();
             } catch {}
