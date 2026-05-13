@@ -106,64 +106,69 @@ async function getMediaMetadata(url) {
         const client = await page.target().createCDPSession();
         await client.send("Network.enable");
 
-        // 🔥 BLOCK UNNECESSARY RESOURCES (Speed up loading)
-        await page.setRequestInterception(true);
-        page.on('request', (request) => {
-            const resourceType = request.resourceType();
-            if (['image', 'stylesheet', 'font', 'other'].includes(resourceType)) {
-                request.abort();
-            } else {
-                request.continue();
-            }
-        });
-
         client.on("Network.responseReceived", (response) => {
             const resUrl = response.response.url;
-            if ((resUrl.includes(".mp4") || resUrl.includes("video_dashinit")) && !resUrl.includes("blob:")) {
+            if ((resUrl.includes(".mp4") || resUrl.includes("video_dashinit") || resUrl.includes(".m4v")) && !resUrl.includes("blob:")) {
                 mediaUrls.push(resUrl);
             }
         });
 
-        console.log("📡 Navigating...");
-        // Use shorter timeout and different waitUntil for speed
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+        console.log("📡 Navigating to:", url);
+        await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-        // Wait for video element or a short time
-        try {
-            await page.waitForSelector("video", { timeout: 10000 });
-        } catch (e) {
-            console.log("⏱️ Video selector timeout, trying to extract anyway...");
+        // Extra wait to ensure all scripts run
+        await new Promise(r => setTimeout(r, 3000));
+
+        // Check if we are stuck on login page
+        const pageTitle = await page.title();
+        if (pageTitle.includes("Login") || pageTitle.includes("Log in")) {
+            console.log("⚠️ Page redirected to Login. Trying to proceed anyway...");
         }
 
-        // Extract video and poster
+        // Deep extraction logic
         const metadata = await page.evaluate(() => {
-            const getMeta = (prop) => {
-                const el = document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`);
-                return el ? el.content : null;
-            };
+            const results = { vSrc: null, pSrc: null };
 
-            const video = document.querySelector("video");
-            let vSrc = getMeta("og:video") || getMeta("og:video:secure_url");
-            let pSrc = getMeta("og:image") || getMeta("og:image:secure_url");
+            // 1. Check meta tags first (fastest)
+            const metaV = document.querySelector('meta[property="og:video"]');
+            const metaI = document.querySelector('meta[property="og:image"]');
+            if (metaV) results.vSrc = metaV.content;
+            if (metaI) results.pSrc = metaI.content;
 
-            if (video && !vSrc) {
-                vSrc = (video.src && !video.src.includes("blob:")) ? video.src : null;
-                if (!vSrc) {
-                    const sources = Array.from(document.querySelectorAll("video source"));
-                    if (sources.length > 0) vSrc = sources[0].src;
+            // 2. Look for video tags
+            if (!results.vSrc) {
+                const video = document.querySelector("video");
+                if (video) {
+                    results.vSrc = video.src;
+                    results.pSrc = results.pSrc || video.poster;
+                    if (results.vSrc.startsWith('blob:')) {
+                        // If blob, we rely on network response listener
+                        results.vSrc = null;
+                    }
                 }
-                pSrc = pSrc || video.poster;
             }
 
-            // If no poster found, try to find the main image
-            if (!pSrc) {
-                const images = Array.from(document.querySelectorAll("img"));
-                const mainImg = images.find(img => img.width > 200 && img.height > 200);
-                if (mainImg) pSrc = mainImg.src;
-            }
+            // 3. Look for script data (__additionalData)
+            try {
+                const scripts = Array.from(document.querySelectorAll('script'));
+                for (const s of scripts) {
+                    if (s.innerText.includes('video_url')) {
+                        const match = s.innerText.match(/"video_url":"([^"]+)"/);
+                        if (match) results.vSrc = match[1].replace(/\\u0026/g, '&');
+                    }
+                }
+            } catch (e) {}
 
-            return { vSrc, pSrc };
+            return results;
         });
+
+        if (metadata.vSrc) mediaUrls.push(metadata.vSrc);
+        thumbnailUrl = metadata.pSrc;
+
+        if (mediaUrls.length === 0) {
+            console.log("⏱️ No direct link found, waiting for background network requests...");
+            await new Promise(r => setTimeout(r, 5000));
+        }
 
         if (metadata.vSrc) mediaUrls.push(metadata.vSrc);
         thumbnailUrl = metadata.pSrc;
