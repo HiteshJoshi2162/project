@@ -8,22 +8,43 @@ const morgan = require('morgan');
 const extractRoutes = require('./extract.routes');
 const { errorHandler } = require('./error.middleware');
 
+// ✅ Puppeteer Browser Init
+const { initBrowser } = require('./extract.service');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ✅ Start Puppeteer Browser
+initBrowser()
+    .then(() => {
+        console.log('✅ Browser initialized successfully');
+    })
+    .catch((err) => {
+        console.error('❌ Failed to initialize browser:', err);
+    });
+
 // Security
-app.use(helmet());
+app.use(
+    helmet({
+        crossOriginResourcePolicy: false
+    })
+);
 
 // CORS
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST']
-}));
+app.use(
+    cors({
+        origin: '*',
+        methods: ['GET', 'POST'],
+        allowedHeaders: ['Content-Type']
+    })
+);
 
 // Body Parser
-app.use(express.json({
-    limit: '10mb'
-}));
+app.use(
+    express.json({
+        limit: '10mb'
+    })
+);
 
 // Logger
 app.use(morgan('dev'));
@@ -40,7 +61,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
     res.status(200).json({
         status: 'success',
-        message: 'Instagram Media Extractor API Running'
+        message: 'Instagram Media Extractor API Running 🚀'
     });
 });
 
@@ -49,14 +70,15 @@ app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'ok',
         uptime: process.uptime(),
+        memory: process.memoryUsage(),
         timestamp: new Date().toISOString()
     });
 });
 
-// Routes
+// API Routes
 app.use('/api', extractRoutes);
 
-// 404
+// 404 Handler
 app.use((req, res) => {
     res.status(404).json({
         status: 'error',
@@ -64,13 +86,25 @@ app.use((req, res) => {
     });
 });
 
-// Error Handler
+// Global Error Handler
 app.use(errorHandler);
 
 // Start Server
 app.listen(PORT, '0.0.0.0', () => {
+
     console.log('===================================');
     console.log(`🚀 Server Running On Port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📡 Health URL: /health`);
     console.log('===================================');
+
+});
+
+// Prevent Crashes
+process.on('unhandledRejection', (err) => {
+    console.error('❌ Unhandled Rejection:', err);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught Exception:', err);
 });
