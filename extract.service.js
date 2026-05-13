@@ -1,48 +1,83 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
+
+let browser;
+
+const initBrowser = async () => {
+
+    if (browser) return browser;
+
+    browser = await puppeteer.launch({
+        headless: "new",
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-features=site-per-process'
+        ]
+    });
+
+    console.log("✅ Puppeteer Browser Started");
+
+    return browser;
+};
 
 const getMediaMetadata = async (url) => {
 
+    let page;
+
     try {
 
-        const response = await axios.get(url, {
-            headers: {
-                'User-Agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9'
-            },
-            timeout: 30000,
-            maxRedirects: 5
+        const browserInstance = await initBrowser();
+
+        page = await browserInstance.newPage();
+
+        await page.setUserAgent(
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36'
+        );
+
+        await page.setExtraHTTPHeaders({
+            'accept-language': 'en-US,en;q=0.9'
         });
 
-        const html = response.data;
+        await page.goto(url, {
+            waitUntil: 'networkidle2',
+            timeout: 60000
+        });
 
-        const $ = cheerio.load(html);
+        // Wait little for Instagram
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // Video
-        let video =
-            $('meta[property="og:video"]').attr('content') ||
-            $('meta[property="og:video:url"]').attr('content');
+        const media = await page.evaluate(() => {
 
-        // Image
-        let image =
-            $('meta[property="og:image"]').attr('content');
+            const video =
+                document.querySelector('meta[property="og:video"]')?.content ||
+                document.querySelector('meta[property="og:video:url"]')?.content;
 
-        if (video) {
+            const image =
+                document.querySelector('meta[property="og:image"]')?.content;
+
+            return {
+                video,
+                image
+            };
+        });
+
+        if (media.video) {
 
             return {
                 isVideo: true,
-                downloadUrl: video,
-                thumbnailUrl: image || video
+                downloadUrl: media.video,
+                thumbnailUrl: media.image || media.video
             };
         }
 
-        if (image) {
+        if (media.image) {
 
             return {
                 isVideo: false,
-                downloadUrl: image,
-                thumbnailUrl: image
+                downloadUrl: media.image,
+                thumbnailUrl: media.image
             };
         }
 
@@ -50,12 +85,21 @@ const getMediaMetadata = async (url) => {
 
     } catch (err) {
 
-        console.error('SERVICE ERROR:', err.message);
+        console.error("❌ SERVICE ERROR:", err.message);
 
         throw new Error('MEDIA_NOT_FOUND');
+
+    } finally {
+
+        if (page) {
+            try {
+                await page.close();
+            } catch {}
+        }
     }
 };
 
 module.exports = {
+    initBrowser,
     getMediaMetadata
 };
