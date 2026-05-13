@@ -8,7 +8,8 @@ const cleanUrl = (url) => {
     if (!cleaned.startsWith("http")) {
         cleaned = "https://" + cleaned;
     }
-    return cleaned.split("?")[0];
+    // DO NOT split by "?" here, as Instagram URLs need their parameters
+    return cleaned;
 };
 
 const processExtraction = async (url, res) => {
@@ -43,6 +44,7 @@ console.log("📥 Incoming URL:", url);
         ]);
 
         if (!media || !media.downloadUrl) {
+            console.error("❌ MEDIA NOT FOUND FOR URL:", url);
             throw new Error("NO_MEDIA_FOUND");
         }
 
@@ -67,7 +69,7 @@ console.log("📥 Incoming URL:", url);
 
         if (error.message === "TIMEOUT") {
             message = "Server timeout, Instagram is taking too long to respond";
-        } else if (error.message === "MEDIA_NOT_FOUND") {
+        } else if (error.message === "MEDIA_NOT_FOUND" || error.message === "NO_MEDIA_FOUND") {
             message = "Could not find any video or image in this link. Make sure the account is public.";
         } else if (error.message === "INVALID_URL") {
             message = "Please provide a valid Instagram link";
