@@ -1,45 +1,76 @@
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+
 const extractRoutes = require('./extract.routes');
 const { errorHandler } = require('./error.middleware');
-const { initBrowser } = require('./extract.service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize Puppeteer Browser
-initBrowser().catch(err => console.error("Failed to init browser:", err));
-
-// Middleware
+// Security
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+
+// CORS
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST']
+}));
+
+// Body Parser
+app.use(express.json({
+    limit: '10mb'
+}));
+
+// Logger
 app.use(morgan('dev'));
 
 // Request Logger
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} from ${req.ip}`);
+    console.log(
+        `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} IP:${req.ip}`
+    );
     next();
 });
 
+// Root
+app.get('/', (req, res) => {
+    res.status(200).json({
+        status: 'success',
+        message: 'Instagram Media Extractor API Running'
+    });
+});
+
+// Health
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Routes
-app.get('/', (req, res) => res.send('Story Reels Saver API is running!'));
 app.use('/api', extractRoutes);
 
-// Health check
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+// 404
+app.use((req, res) => {
+    res.status(404).json({
+        status: 'error',
+        message: 'Route not found'
+    });
+});
 
-
-// Error Handling
+// Error Handler
 app.use(errorHandler);
 
+// Start Server
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`--------------------------------------------------`);
-    console.log(`🚀 SERVER RUNNING AT: http://192.168.31.206:${PORT}`);
-    console.log(`✅ Listening on all interfaces (0.0.0.0)`);
-    console.log(`📱 Connect your Android phone to: http://192.168.31.206:${PORT}/health`);
-    console.log(`--------------------------------------------------`);
+    console.log('===================================');
+    console.log(`🚀 Server Running On Port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log('===================================');
 });
