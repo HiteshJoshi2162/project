@@ -106,6 +106,17 @@ async function getMediaMetadata(url) {
         const client = await page.target().createCDPSession();
         await client.send("Network.enable");
 
+        // 🔥 BLOCK UNNECESSARY RESOURCES (Speed up loading)
+        await page.setRequestInterception(true);
+        page.on('request', (request) => {
+            const resourceType = request.resourceType();
+            if (['image', 'stylesheet', 'font', 'other'].includes(resourceType)) {
+                request.abort();
+            } else {
+                request.continue();
+            }
+        });
+
         client.on("Network.responseReceived", (response) => {
             const resUrl = response.response.url;
             if ((resUrl.includes(".mp4") || resUrl.includes("video_dashinit")) && !resUrl.includes("blob:")) {
@@ -114,29 +125,34 @@ async function getMediaMetadata(url) {
         });
 
         console.log("📡 Navigating...");
-        await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+        // Use shorter timeout and different waitUntil for speed
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-        // Scroll a bit
-        await page.evaluate(async () => {
-            window.scrollBy(0, 500);
-            await new Promise(r => setTimeout(r, 1000));
-        });
+        // Wait for video element or a short time
+        try {
+            await page.waitForSelector("video", { timeout: 10000 });
+        } catch (e) {
+            console.log("⏱️ Video selector timeout, trying to extract anyway...");
+        }
 
         // Extract video and poster
         const metadata = await page.evaluate(() => {
+            const getMeta = (prop) => {
+                const el = document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`);
+                return el ? el.content : null;
+            };
+
             const video = document.querySelector("video");
-            let vSrc = null;
-            let pSrc = null;
+            let vSrc = getMeta("og:video") || getMeta("og:video:secure_url");
+            let pSrc = getMeta("og:image") || getMeta("og:image:secure_url");
 
-            if (video) {
+            if (video && !vSrc) {
                 vSrc = (video.src && !video.src.includes("blob:")) ? video.src : null;
-                pSrc = video.poster || null;
-
-                // If src is still null, check children
                 if (!vSrc) {
                     const sources = Array.from(document.querySelectorAll("video source"));
                     if (sources.length > 0) vSrc = sources[0].src;
                 }
+                pSrc = pSrc || video.poster;
             }
 
             // If no poster found, try to find the main image
