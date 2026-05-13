@@ -8,20 +8,8 @@ const morgan = require('morgan');
 const extractRoutes = require('./extract.routes');
 const { errorHandler } = require('./error.middleware');
 
-// ✅ Puppeteer Browser Init
-const { initBrowser } = require('./extract.service');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// ✅ Start Puppeteer Browser
-initBrowser()
-    .then(() => {
-        console.log('✅ Browser initialized successfully');
-    })
-    .catch((err) => {
-        console.error('❌ Failed to initialize browser:', err);
-    });
 
 // Security
 app.use(
@@ -51,26 +39,29 @@ app.use(morgan('dev'));
 
 // Request Logger
 app.use((req, res, next) => {
+
     console.log(
         `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} IP:${req.ip}`
     );
+
     next();
 });
 
-// Root
+// Root Route
 app.get('/', (req, res) => {
+
     res.status(200).json({
         status: 'success',
         message: 'Instagram Media Extractor API Running 🚀'
     });
 });
 
-// Health
+// Health Route
 app.get('/health', (req, res) => {
+
     res.status(200).json({
         status: 'ok',
         uptime: process.uptime(),
-        memory: process.memoryUsage(),
         timestamp: new Date().toISOString()
     });
 });
@@ -80,6 +71,7 @@ app.use('/api', extractRoutes);
 
 // 404 Handler
 app.use((req, res) => {
+
     res.status(404).json({
         status: 'error',
         message: 'Route not found'
@@ -102,9 +94,11 @@ app.listen(PORT, '0.0.0.0', () => {
 
 // Prevent Crashes
 process.on('unhandledRejection', (err) => {
+
     console.error('❌ Unhandled Rejection:', err);
 });
 
 process.on('uncaughtException', (err) => {
+
     console.error('❌ Uncaught Exception:', err);
 });
