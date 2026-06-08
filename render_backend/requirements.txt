@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+instagrapi
+pydantic
+python-multipart
+python-dotenv
