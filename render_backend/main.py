@@ -8,6 +8,31 @@ from instagrapi.exceptions import LoginRequired, ChallengeRequired
 
 app = FastAPI(title="Instagram Media Saver API")
 
+# Root Route
+@app.get("/")
+async def root():
+    return {
+        "status": "success",
+        "message": "Instagram Media Saver API Running 🚀",
+        "docs": "/docs",
+        "endpoints": {
+            "login": "/login",
+            "download_reel": "/download/reel",
+            "download_post": "/download/post",
+            "stories": "/stories",
+            "logout": "/logout"
+        }
+    }
+
+# Health Check
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "Instagram Media Saver API"
+    }
+
+
 # Simple session storage - In production, use a database or encrypted storage
 SESSION_DIR = "sessions"
 if not os.path.exists(SESSION_DIR):
